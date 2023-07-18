@@ -1,0 +1,19 @@
+#!/usr/bin/env python
+
+import os
+import sys
+
+import django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'project.settings')
+django.setup()
+
+from django.utils import timezone
+from project.apps.bookings import models
+from project.apps.core.emails import Emails
+
+
+for department in models.Department.objects.all():
+    if department.send_email_reminder():
+        if models.Booking.objects.filter(start_time__date__gt=timezone.now(), activity__department=department, activity__activity_type='guided', is_cancelled=False).exists():
+            Emails.email_new_activities_reminder_to_service_providers(department)
+            department.set_email_reminder_last_sent()

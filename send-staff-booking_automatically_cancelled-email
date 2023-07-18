@@ -1,0 +1,33 @@
+#!/usr/bin/env python
+
+import os
+import sys
+
+import django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'project.settings')
+django.setup()
+
+from datetime import timedelta
+from django.utils import timezone
+from project.apps.bookings import models
+from project.apps.bookings.admin.views import ConfirmedBookings
+from project.apps.core.emails import Emails
+from project.apps.core import calendars
+
+if settings := models.SystemSettings.objects.first():
+    notice_date = timezone.now() + timedelta(days=settings.automated_cancellation_notice)
+    for booking in models.Booking.objects.filter(start_time__date=notice_date.date(), is_cancelled=False):
+        if booking.status == models.Booking.STATUS.PENDING:
+            booking.is_cancelled = True
+            booking.cancellation_time = timezone.now()
+            calendars.cancel_event(None, booking)
+            Emails.email_cancellation_to_visitor(booking)
+            ConfirmedBookings().email_cancellation_to_all_group_service_provider(booking)
+            Emails.email_booking_automatically_cancelled_to_staff(booking)
+            booking.save()
+            lunchroomBookings = models.LunchroomBooking.objects.filter(booking=booking)
+            for lunchroomBooking in lunchroomBookings:
+                lunchroomBooking.delete()
+
+            
+

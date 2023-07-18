@@ -1,0 +1,20 @@
+#!/usr/bin/env python
+
+import os
+import sys
+
+import django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'project.settings')
+django.setup()
+
+from datetime import timedelta
+from django.utils import timezone
+from project.apps.bookings import models
+from project.apps.core.emails import Emails
+
+if settings := models.SystemSettings.objects.first():
+    notice_date = timezone.now() + timedelta(days=settings.no_service_provider_notice)
+    for booking in models.Booking.objects.filter(start_time__date=notice_date.date(), is_cancelled=False):
+        if booking.status == models.Booking.STATUS.PENDING:
+            Emails.email_no_freelancer_allocated_to_staff(booking)
+

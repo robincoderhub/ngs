@@ -1,0 +1,19 @@
+#!/usr/bin/env python
+
+import os
+import sys
+
+import django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'project.settings')
+django.setup()
+
+from datetime import timedelta
+from django.utils import timezone
+from project.apps.bookings import models
+from project.apps.core.emails import Emails
+
+if settings := models.SystemSettings.objects.first():
+    notice_date = timezone.now() - timedelta(days=settings.feedback_email_delay)
+    for booking in models.Booking.objects.filter(start_time__date=notice_date.date(), is_cancelled=False):
+        Emails.email_feedback_to_visitor(booking)
+

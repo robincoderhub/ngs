@@ -1,0 +1,41 @@
+#!/usr/bin/env python
+
+import os
+import sys
+
+import django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'project.settings')
+django.setup()
+
+from datetime import date
+from django.utils.timezone import localdate
+from project.apps.bookings.models import MonthlyBudget
+
+# add one more year budget
+target_date = date(localdate().year+2, 3, 1)
+start_date = date(localdate().year, localdate().month, 1)
+while start_date <= target_date:
+    if not MonthlyBudget.objects.filter(month=start_date).exists():
+        MonthlyBudget.objects.create(month=start_date, available=0, booked=0)
+    if start_date.month == 12:
+        year = start_date.year + 1
+        month = 1
+    else:
+        year = start_date.year
+        month = start_date.month + 1
+    start_date = date(year, month, 1)
+
+# if last month has remaining budgets, add the remaining budget to current month and set available equal to booked budgets 
+last_year = localdate().year
+last_month = localdate().month - 1
+if last_month < 1:
+    last_year = last_year - 1
+    last_month = 12
+last_month_budget = MonthlyBudget.objects.filter(month=date(last_year, last_month, 1)).first()
+if last_month_budget:
+    if last_month_budget.booked < last_month_budget.available:
+        current_month_budget = MonthlyBudget.objects.filter(month=date(localdate().year, localdate().month, 1)).first()
+        current_month_budget.available = current_month_budget.available + last_month_budget.available - last_month_budget.booked
+        current_month_budget.save()
+        last_month_budget.available = last_month_budget.booked
+        last_month_budget.save()
